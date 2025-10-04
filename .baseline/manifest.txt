@@ -1,0 +1,17 @@
+Project: Termux-Ultra
+Baseline: Gradle Android App (Compose enabled)
+Plugins:
+  - com.android.application (8.3.2)
+  - org.jetbrains.kotlin.android (1.9.24)
+
+Configs:
+  - compileSdk 35
+  - minSdk 26, targetSdk 35
+  - kotlinCompilerExtensionVersion 1.5.13
+  - AndroidX + Compose M3
+  - gradle.properties with android.useAndroidX=true, enableJetifier=true
+  - Proguard stub added
+
+Ledger:
+  Snapshots: ~/Termux-Ultra/.baseline/
+  Logs: ~/Termux-Ultra/.ledger/

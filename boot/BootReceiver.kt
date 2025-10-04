@@ -1,0 +1,1 @@
+package com.example.boot; import android.content.*; class BootReceiver: BroadcastReceiver(){ override fun onReceive(c:Context,i:Intent){ if(i.action==Intent.ACTION_BOOT_COMPLETED) println("Boot!") } }
