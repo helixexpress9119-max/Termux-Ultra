@@ -1,11 +1,26 @@
-/.gradle
-/local.properties
-/.idea
-/captures
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# Local configuration
+local.properties
+
+# Android Studio
+.idea/
 *.iml
+
+# Logs and temp
+*.log
+*.tmp
+*.swp
+
+# APKs / outputs
 *.apk
-*.ap_
 *.aab
-*.keystore
-*.jks
-*.tar.gz
+*.ap_
+
+# Cache
+.cxx/
+captures/
+outputs/
