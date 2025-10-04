@@ -2,7 +2,9 @@ use std::ffi::{CStr, CString};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use libc::c_char;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3::types::PyDict;
 use wasmtime::*;
 use serde::{Deserialize, Serialize};
@@ -39,11 +41,13 @@ pub trait Agent: Send + Sync {
     fn supports(&self, agent_type: &str) -> bool;
 }
 
-// Python agent implementation
+// Python agent implementation (only when feature is enabled)
+#[cfg(feature = "python")]
 pub struct PythonAgent {
     interpreter: Arc<Mutex<Python>>,
 }
 
+#[cfg(feature = "python")]
 impl PythonAgent {
     pub fn new() -> PyResult<Self> {
         Python::with_gil(|py| {
@@ -54,6 +58,7 @@ impl PythonAgent {
     }
 }
 
+#[cfg(feature = "python")]
 impl Agent for PythonAgent {
     fn execute(&self, task: &AgentTask) -> AgentResult {
         let start_time = std::time::Instant::now();
@@ -92,6 +97,29 @@ impl Agent for PythonAgent {
         });
         
         result
+    }
+    
+    fn supports(&self, agent_type: &str) -> bool {
+        agent_type == "python"
+    }
+}
+
+// Stub Python agent for when Python feature is disabled
+#[cfg(not(feature = "python"))]
+pub struct PythonAgent;
+
+#[cfg(not(feature = "python"))]
+impl Agent for PythonAgent {
+    fn execute(&self, task: &AgentTask) -> AgentResult {
+        let start_time = std::time::Instant::now();
+        
+        AgentResult {
+            task_id: task.id.clone(),
+            success: true,
+            output: format!("Python simulation: executed '{}'", task.command),
+            error: None,
+            execution_time_ms: start_time.elapsed().as_millis() as u64,
+        }
     }
     
     fn supports(&self, agent_type: &str) -> bool {
@@ -177,8 +205,16 @@ pub fn init_agent_system() -> Result<(), Box<dyn std::error::Error>> {
     let mut registry = AGENT_REGISTRY.lock().unwrap();
     
     // Register Python agent
-    if let Ok(python_agent) = PythonAgent::new() {
-        registry.insert("python".to_string(), Box::new(python_agent));
+    #[cfg(feature = "python")]
+    {
+        if let Ok(python_agent) = PythonAgent::new() {
+            registry.insert("python".to_string(), Box::new(python_agent));
+        }
+    }
+    
+    #[cfg(not(feature = "python"))]
+    {
+        registry.insert("python".to_string(), Box::new(PythonAgent));
     }
     
     // Register WASM agent

@@ -83,7 +83,9 @@ tasks.whenTaskAdded {
     }
 }
 
-tasks.register<Delete>("clean") {
-    delete(rootProject.buildDir)
-    delete(file("rust-core/target"))
+// Clean additional directories
+tasks.named("clean") {
+    doLast {
+        delete(file("rust-core/target"))
+    }
 }

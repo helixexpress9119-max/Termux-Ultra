@@ -1,0 +1,328 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scan every Monday at 3 AM UTC
+    - cron: '0 3 * * 1'
+
+env:
+  JAVA_VERSION: "17"
+  RUST_VERSION: "1.75.0"
+  GO_VERSION: "1.21"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  security-scan:
+    name: Multi-Language Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Rust ${{ env.RUST_VERSION }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          override: true
+
+      - name: Setup Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Android/Kotlin/Java Security
+      - name: Run OWASP Dependency Check (Android/Java)
+        run: |
+          ./gradlew dependencyCheckAnalyze
+          
+      - name: Upload OWASP Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: build/reports/dependency-check-report.*
+
+      # Rust Security
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit
+
+      - name: Run Rust Security Audit
+        working-directory: rust-core
+        run: |
+          cargo audit --json > ../rust-audit-report.json || true
+          
+      - name: Upload Rust Audit Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-audit-report
+          path: rust-audit-report.json
+
+      # Go Security
+      - name: Run Go Vulnerability Check
+        if: hashFiles('agents/go/go.mod') != ''
+        working-directory: agents/go
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./... > ../../go-vuln-report.txt || true
+
+      - name: Run Nancy (Go dependency scanner)
+        if: hashFiles('agents/go/go.mod') != ''
+        working-directory: agents/go
+        run: |
+          go list -json -m all | docker run --rm -i sonatypecommunity/nancy:latest sleuth > ../../nancy-report.txt || true
+
+      - name: Upload Go Security Reports
+        uses: actions/upload-artifact@v3
+        if: hashFiles('agents/go/go.mod') != ''
+        with:
+          name: go-security-reports
+          path: |
+            go-vuln-report.txt
+            nancy-report.txt
+
+      # Python Security
+      - name: Install Python Security Tools
+        run: |
+          pip install safety bandit semgrep
+
+      - name: Run Safety Check (Python dependencies)
+        working-directory: agents/python
+        run: |
+          if [ -f requirements.txt ]; then
+            safety check -r requirements.txt --json > ../../python-safety-report.json || true
+          fi
+
+      - name: Run Bandit (Python code security)
+        working-directory: agents/python
+        run: |
+          bandit -r . -f json -o ../../python-bandit-report.json || true
+
+      - name: Upload Python Security Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-security-reports
+          path: |
+            python-safety-report.json
+            python-bandit-report.json
+
+      # Code Quality and SAST
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/android
+            p/kotlin
+            p/rust
+            p/go
+            p/python
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      # License Check
+      - name: License Compatibility Check
+        run: |
+          echo "Checking license compatibility..."
+          
+          # Check Gradle dependencies
+          ./gradlew generateLicenseReport || true
+          
+          # Check Rust dependencies
+          if [ -d rust-core ]; then
+            cd rust-core
+            cargo install cargo-license
+            cargo license --json > ../rust-licenses.json || true
+            cd ..
+          fi
+          
+          # Check Go dependencies
+          if [ -f agents/go/go.mod ]; then
+            cd agents/go
+            go mod download
+            go list -m -json all > ../../go-dependencies.json || true
+            cd ../..
+          fi
+
+      - name: Upload License Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-reports
+          path: |
+            build/reports/dependency-license/
+            rust-licenses.json
+            go-dependencies.json
+
+      # Secret Scanning
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      # Container Security (if Dockerfile exists)
+      - name: Run Trivy Vulnerability Scanner
+        if: hashFiles('Dockerfile', 'docker/Dockerfile') != ''
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy Scan Results
+        if: hashFiles('Dockerfile', 'docker/Dockerfile') != ''
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      # Generate Security Summary
+      - name: Generate Security Summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "Date: $(date)" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          echo "## Scanned Components" >> security-summary.md
+          echo "- ✅ Android/Kotlin/Java dependencies" >> security-summary.md
+          echo "- ✅ Rust crates and security advisories" >> security-summary.md
+          
+          if [ -f agents/go/go.mod ]; then
+            echo "- ✅ Go modules and vulnerabilities" >> security-summary.md
+          fi
+          
+          if [ -d agents/python ]; then
+            echo "- ✅ Python packages and code security" >> security-summary.md
+          fi
+          
+          echo "- ✅ Source code analysis (SAST)" >> security-summary.md
+          echo "- ✅ Secret detection" >> security-summary.md
+          echo "- ✅ License compatibility" >> security-summary.md
+          
+          echo "" >> security-summary.md
+          echo "## Reports Generated" >> security-summary.md
+          echo "Check the Actions artifacts for detailed reports." >> security-summary.md
+
+      - name: Upload Security Summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-summary
+          path: security-summary.md
+
+      # Notify on High Severity Issues
+      - name: Check for High Severity Issues
+        id: security_check
+        run: |
+          HIGH_SEVERITY=false
+          
+          # Check OWASP results
+          if [ -f build/reports/dependency-check-report.json ]; then
+            HIGH_COUNT=$(jq '.vulnerabilities[] | select(.severity == "HIGH" or .severity == "CRITICAL") | length' build/reports/dependency-check-report.json 2>/dev/null || echo "0")
+            if [ "$HIGH_COUNT" -gt 0 ]; then
+              HIGH_SEVERITY=true
+            fi
+          fi
+          
+          # Check Rust audit results
+          if [ -f rust-audit-report.json ]; then
+            RUST_HIGH=$(jq '.vulnerabilities[] | select(.advisory.severity == "high" or .advisory.severity == "critical") | length' rust-audit-report.json 2>/dev/null || echo "0")
+            if [ "$RUST_HIGH" -gt 0 ]; then
+              HIGH_SEVERITY=true
+            fi
+          fi
+          
+          echo "high_severity=$HIGH_SEVERITY" >> $GITHUB_OUTPUT
+
+      - name: Create Security Issue
+        if: steps.security_check.outputs.high_severity == 'true' && github.event_name != 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 High Severity Security Vulnerabilities Detected',
+              body: `
+              ## Security Alert
+              
+              High or critical severity vulnerabilities have been detected in the codebase.
+              
+              **Scan Details:**
+              - Date: ${new Date().toISOString()}
+              - Commit: ${context.sha}
+              - Workflow: ${context.workflow}
+              
+              **Action Required:**
+              1. Review the security scan artifacts
+              2. Update vulnerable dependencies
+              3. Apply security patches
+              4. Re-run security scan to verify fixes
+              
+              **Reports:**
+              Check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for detailed reports.
+              `,
+              labels: ['security', 'high-priority', 'vulnerability']
+            })
+
+  # Weekly Security Report
+  weekly-security-report:
+    name: Weekly Security Report
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: security-scan
+    
+    steps:
+      - name: Download Security Reports
+        uses: actions/download-artifact@v3
+        with:
+          path: security-reports
+
+      - name: Generate Weekly Report
+        run: |
+          echo "# Weekly Security Report - $(date +'%Y-%m-%d')" > weekly-security-report.md
+          echo "" >> weekly-security-report.md
+          echo "## Summary" >> weekly-security-report.md
+          echo "Automated security scan completed for all supported languages:" >> weekly-security-report.md
+          echo "- Kotlin/Android" >> weekly-security-report.md
+          echo "- Rust" >> weekly-security-report.md
+          echo "- Java" >> weekly-security-report.md
+          echo "- Go" >> weekly-security-report.md
+          echo "- Python" >> weekly-security-report.md
+          echo "- WASM" >> weekly-security-report.md
+          echo "" >> weekly-security-report.md
+          echo "## Next Steps" >> weekly-security-report.md
+          echo "1. Review all generated reports" >> weekly-security-report.md
+          echo "2. Update vulnerable dependencies" >> weekly-security-report.md
+          echo "3. Monitor for new security advisories" >> weekly-security-report.md
+
+      - name: Upload Weekly Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: weekly-security-report
+          path: weekly-security-report.md

@@ -1,0 +1,492 @@
+name: Termux-Ultra CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [published]
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+  JAVA_VERSION: "17"
+  RUST_VERSION: "1.75.0"
+  GO_VERSION: "1.21"
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "18"
+
+jobs:
+  # Multi-language lint and format check
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Rust ${{ env.RUST_VERSION }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          override: true
+
+      - name: Setup Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Kotlin/Java Lint (ktlint)
+        run: ./gradlew ktlintCheck
+
+      - name: Rust Format Check
+        working-directory: rust-core
+        run: cargo fmt --all -- --check
+
+      - name: Rust Lint (Clippy)
+        working-directory: rust-core
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Go Format Check
+        working-directory: agents/go
+        run: |
+          if [ -f go.mod ]; then
+            go fmt ./...
+            if [ "$(gofmt -l .)" != "" ]; then
+              echo "Go code is not formatted. Run 'go fmt ./...'"
+              exit 1
+            fi
+          fi
+
+      - name: Python Lint (Black & Flake8)
+        run: |
+          pip install black flake8
+          black --check agents/python/
+          flake8 agents/python/
+
+  # Rust core build and test
+  rust-build-test:
+    name: Rust Core Build & Test
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust ${{ env.RUST_VERSION }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust Core
+        working-directory: rust-core
+        run: cargo build --release
+
+      - name: Run Rust Tests
+        working-directory: rust-core
+        run: cargo test --all --release
+
+      - name: Build WASM Target
+        working-directory: rust-core
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --target wasm32-unknown-unknown --release
+
+      - name: Upload Rust Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-artifacts
+          path: |
+            rust-core/target/release/
+            rust-core/target/wasm32-unknown-unknown/release/
+
+  # Android build and test matrix
+  android-build-test:
+    name: Android Build & Test (API ${{ matrix.api-level }})
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, rust-build-test]
+    strategy:
+      matrix:
+        api-level: [26, 28, 30, 33, 34]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download Rust Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: rust-artifacts
+          path: rust-core/
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udev control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Instrumented Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          script: ./gradlew connectedAndroidTest
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: apk-artifacts-api-${{ matrix.api-level }}
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-api-${{ matrix.api-level }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+
+  # Multi-language agent tests
+  agent-tests:
+    name: Agent Tests (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    strategy:
+      matrix:
+        language: [java, go, python, wasm]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java (for Java agent)
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Go (for Go agent)
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Python (for Python agent)
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Rust (for WASM agent)
+        if: matrix.language == 'wasm'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Test Java Agent
+        if: matrix.language == 'java'
+        working-directory: agents/java
+        run: |
+          if [ -f build.gradle ]; then
+            ./gradlew test
+          elif [ -f pom.xml ]; then
+            mvn test
+          else
+            javac Agent.java && java Agent
+          fi
+
+      - name: Test Go Agent
+        if: matrix.language == 'go'
+        working-directory: agents/go
+        run: |
+          if [ -f go.mod ]; then
+            go test ./...
+            go build -o agent agent.go
+            ./agent --test
+          else
+            go build -o agent agent.go
+            ./agent --test
+          fi
+
+      - name: Test Python Agent
+        if: matrix.language == 'python'
+        working-directory: agents/python
+        run: |
+          pip install -r requirements.txt || true
+          python -m pytest . || python agent.py --test
+
+      - name: Test WASM Agent
+        if: matrix.language == 'wasm'
+        working-directory: agents/wasm
+        run: |
+          rustup target add wasm32-unknown-unknown
+          if [ -f Cargo.toml ]; then
+            cargo test
+            cargo build --target wasm32-unknown-unknown
+          else
+            # Compile WAT to WASM if no Cargo.toml
+            if command -v wat2wasm &> /dev/null; then
+              wat2wasm agent.wat -o agent.wasm
+            fi
+          fi
+
+  # Security and code quality analysis
+  security-analysis:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Run Dependency Check
+        run: ./gradlew dependencyCheckAnalyze
+
+      - name: Run Security Audit (Rust)
+        working-directory: rust-core
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            build/reports/dependency-check-report.html
+            rust-core/target/audit/
+
+  # Release build and deployment
+  release-build:
+    name: Release Build & Deploy
+    runs-on: ubuntu-latest
+    needs: [android-build-test, agent-tests, security-analysis]
+    if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download Rust Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: rust-artifacts
+          path: rust-core/
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Generate version name
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "VERSION_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION_NAME=nightly-$(date +'%Y%m%d')-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Release APK
+        run: |
+          ./gradlew assembleRelease \
+            -PversionName="${{ steps.version.outputs.VERSION_NAME }}" \
+            -PversionCode=${{ github.run_number }}
+
+      - name: Sign APK
+        if: github.event_name == 'release'
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-apk-${{ steps.version.outputs.VERSION_NAME }}
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION_NAME }}
+          name: Nightly Build ${{ steps.version.outputs.VERSION_NAME }}
+          body: |
+            🌙 **Nightly Build**
+            
+            Automated build from commit: ${{ github.sha }}
+            
+            **Changes in this build:**
+            - Latest development features
+            - Bug fixes and improvements
+            - Multi-language agent support (Kotlin, Rust, Java, Go, Python, WASM)
+            
+            **Download:**
+            - [APK for Android](./termux-ultra-${{ steps.version.outputs.VERSION_NAME }}.apk)
+            
+            **Note:** This is a development build. Use at your own risk.
+          files: app/build/outputs/apk/release/*.apk
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Cleanup and notifications
+  cleanup:
+    name: Cleanup & Notify
+    runs-on: ubuntu-latest
+    needs: [release-build]
+    if: always()
+    steps:
+      - name: Discord Notification (Success)
+        if: needs.release-build.result == 'success'
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: |
+            🎉 **Termux-Ultra Build Successful!**
+            
+            ✅ All tests passed
+            📱 APK built and deployed
+            🔧 Multi-language support verified
+            
+            Build: ${{ github.run_number }}
+            Commit: ${{ github.sha }}
+
+      - name: Discord Notification (Failure)
+        if: needs.release-build.result == 'failure'
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: |
+            ❌ **Termux-Ultra Build Failed!**
+            
+            Build: ${{ github.run_number }}
+            Commit: ${{ github.sha }}
+            
+            Please check the logs for details.

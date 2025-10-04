@@ -1,0 +1,53 @@
+# Dependencies security check configuration
+fail_on_cvss_threshold: 7
+auto_update: true
+commit_message: "[Security] Update dependencies to fix vulnerabilities"
+
+# Allowed licenses
+allowed_licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - GPL-3.0
+  - LGPL-2.1
+
+# Security scanning rules
+rules:
+  - rule: high_severity_vulnerabilities
+    action: fail
+    threshold: 1
+  
+  - rule: medium_severity_vulnerabilities
+    action: warn
+    threshold: 5
+  
+  - rule: outdated_dependencies
+    action: warn
+    days: 365
+
+# Language-specific configurations
+languages:
+  kotlin:
+    gradle_security_plugin: true
+    dependency_check: true
+  
+  rust:
+    cargo_audit: true
+    security_advisories: true
+  
+  java:
+    owasp_dependency_check: true
+    snyk_scan: true
+  
+  go:
+    govulncheck: true
+    nancy_scan: true
+  
+  python:
+    safety_check: true
+    bandit_scan: true
+  
+  wasm:
+    wasmtime_security: true

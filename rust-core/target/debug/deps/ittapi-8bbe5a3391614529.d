@@ -1,0 +1,12 @@
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/ittapi-8bbe5a3391614529.d: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/collection_control.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/domain.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/event.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/jit.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/string.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/task.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/util.rs
+
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/libittapi-8bbe5a3391614529.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/collection_control.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/domain.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/event.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/jit.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/string.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/task.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/util.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/collection_control.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/domain.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/event.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/jit.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/string.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/task.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ittapi-0.4.0/src/util.rs:

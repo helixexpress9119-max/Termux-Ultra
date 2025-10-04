@@ -1,0 +1,343 @@
+name: Android CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  JAVA_VERSION: '17'
+  ANDROID_API_LEVEL: 35
+  ANDROID_BUILD_TOOLS_VERSION: '35.0.0'
+
+jobs:
+  lint:
+    name: 🔍 Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: 🛠️ Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: 📦 Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: 🔧 Make gradlew executable
+      run: chmod +x gradlew
+      
+    - name: 📊 Run Kotlin linter
+      run: ./gradlew ktlintCheck
+      
+    - name: 🔍 Run Android lint
+      run: ./gradlew lintDebug
+      
+    - name: 📋 Upload lint reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: lint-reports
+        path: |
+          app/build/reports/lint-results-debug.html
+          app/build/reports/ktlint/
+
+  test:
+    name: 🧪 Unit & Instrumented Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    strategy:
+      matrix:
+        api-level: [28, 30, 33, 35]
+        
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: 🛠️ Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: 📦 Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: 🔧 Make gradlew executable
+      run: chmod +x gradlew
+      
+    - name: 🧪 Run unit tests
+      run: ./gradlew testDebugUnitTest
+      
+    - name: 📱 Enable KVM group perms
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        
+    - name: 📲 Run instrumented tests
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ matrix.api-level }}
+        target: google_apis
+        arch: x86_64
+        profile: Nexus 6
+        script: ./gradlew connectedDebugAndroidTest
+        
+    - name: 📊 Upload test reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-reports-api-${{ matrix.api-level }}
+        path: |
+          app/build/reports/tests/
+          app/build/test-results/
+
+  security:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔍 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: 📋 Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+        
+    - name: 🛡️ Dependency vulnerability check
+      run: |
+        ./gradlew dependencyCheckAnalyze
+        
+    - name: 📊 Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          build/reports/dependency-check/
+
+  build:
+    name: 🏗️ Build & Assemble
+    runs-on: ubuntu-latest
+    needs: [lint, test, security]
+    
+    strategy:
+      matrix:
+        build-type: [debug, release]
+        
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: 🛠️ Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: 🔧 Setup NDK
+      run: |
+        sdkmanager "ndk;26.1.10909125"
+        echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+        
+    - name: 🦀 Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: |
+          aarch64-linux-android
+          armv7-linux-androideabi
+          x86_64-linux-android
+          i686-linux-android
+          
+    - name: 📦 Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: 📦 Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          rust-core/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: 🔧 Make scripts executable
+      run: |
+        chmod +x gradlew
+        chmod +x android-setup.sh
+        chmod +x build-verify.sh
+        chmod +x rust-core/build-android.sh
+        
+    - name: 🏗️ Build Rust core
+      run: |
+        cd rust-core
+        ./build-android.sh
+        
+    - name: 🔐 Decode keystore (Release only)
+      if: matrix.build-type == 'release' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
+        
+    - name: 📱 Build APK (${{ matrix.build-type }})
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        if [ "${{ matrix.build-type }}" == "release" ]; then
+          ./gradlew assembleRelease
+        else
+          ./gradlew assembleDebug
+        fi
+        
+    - name: 🔍 Verify build
+      run: ./build-verify.sh
+      
+    - name: 📊 Generate build info
+      run: |
+        echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+        echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
+        
+    - name: 📝 Create build metadata
+      run: |
+        cat > build-info.json << EOF
+        {
+          "version": "${{ github.ref_name }}",
+          "build_number": ${{ github.run_number }},
+          "git_commit": "${{ env.GIT_COMMIT }}",
+          "build_time": "${{ env.BUILD_TIME }}",
+          "build_type": "${{ matrix.build-type }}",
+          "android_api": ${{ env.ANDROID_API_LEVEL }},
+          "java_version": "${{ env.JAVA_VERSION }}"
+        }
+        EOF
+        
+    - name: 📦 Upload APK artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: termux-ultra-${{ matrix.build-type }}-${{ github.run_number }}
+        path: |
+          app/build/outputs/apk/${{ matrix.build-type }}/*.apk
+          build-info.json
+        retention-days: 30
+
+  release:
+    name: 🚀 GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Download release artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: termux-ultra-release-${{ github.run_number }}
+        path: ./artifacts
+        
+    - name: 📝 Generate changelog
+      id: changelog
+      run: |
+        if [ -f CHANGELOG.md ]; then
+          # Extract changelog for this version
+          awk '/^## \[/{if(p) exit; p=1} p' CHANGELOG.md > current_changelog.md
+        else
+          echo "## Changes in ${{ github.ref_name }}" > current_changelog.md
+          echo "" >> current_changelog.md
+          echo "- Automated release from CI/CD pipeline" >> current_changelog.md
+          echo "- Build #${{ github.run_number }}" >> current_changelog.md
+        fi
+        
+    - name: 🚀 Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./artifacts/*.apk
+          ./artifacts/build-info.json
+        body_path: current_changelog.md
+        draft: false
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notification:
+    name: 📢 Build Notifications
+    runs-on: ubuntu-latest
+    needs: [build, release]
+    if: always()
+    
+    steps:
+    - name: 📊 Collect build status
+      run: |
+        echo "BUILD_STATUS=${{ needs.build.result }}" >> $GITHUB_ENV
+        echo "RELEASE_STATUS=${{ needs.release.result }}" >> $GITHUB_ENV
+        
+    - name: 💬 Discord notification
+      if: env.DISCORD_WEBHOOK_URL != ''
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        if [ "${{ env.BUILD_STATUS }}" == "success" ]; then
+          COLOR="3066993"
+          MESSAGE="✅ Termux-Ultra build successful!"
+        else
+          COLOR="15158332"
+          MESSAGE="❌ Termux-Ultra build failed!"
+        fi
+        
+        curl -H "Content-Type: application/json" \
+             -X POST \
+             -d "{\"embeds\": [{\"color\": $COLOR, \"title\": \"$MESSAGE\", \"description\": \"Build #${{ github.run_number }} for ${{ github.ref_name }}\", \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}]}" \
+             $DISCORD_WEBHOOK_URL
