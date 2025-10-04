@@ -1,0 +1,8 @@
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/wasmtime_cranelift_shared-d1f4f3b05aa609b6.d: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/isa_builder.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/obj.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/compiled_function.rs
+
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/libwasmtime_cranelift_shared-d1f4f3b05aa609b6.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/isa_builder.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/obj.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/compiled_function.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/isa_builder.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/obj.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-cranelift-shared-18.0.4/src/compiled_function.rs:

@@ -1,0 +1,5 @@
+*.html linguist-generated=true
+docs/* linguist-documentation=true
+public/* linguist-vendored=true
+dist/* linguist-vendored=true
+build/* linguist-vendored=true

@@ -1,0 +1,10 @@
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/cpp_demangle-71db2873b8a8fb99.d: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/logging.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/ast.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/error.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/index_str.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/subs.rs
+
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/libcpp_demangle-71db2873b8a8fb99.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/logging.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/ast.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/error.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/index_str.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/subs.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/logging.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/ast.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/error.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/index_str.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpp_demangle-0.3.5/src/subs.rs:

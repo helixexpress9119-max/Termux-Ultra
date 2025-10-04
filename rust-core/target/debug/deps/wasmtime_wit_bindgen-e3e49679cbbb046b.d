@@ -1,0 +1,10 @@
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/wasmtime_wit_bindgen-e3e49679cbbb046b.d: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/rust.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/source.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/types.rs
+
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/libwasmtime_wit_bindgen-e3e49679cbbb046b.rlib: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/rust.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/source.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/types.rs
+
+/workspaces/Termux-Ultra/rust-core/target/debug/deps/libwasmtime_wit_bindgen-e3e49679cbbb046b.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/rust.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/source.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/types.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/rust.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/source.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wit-bindgen-18.0.4/src/types.rs:

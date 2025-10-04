@@ -13,6 +13,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -36,6 +40,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    
+    packagingOptions {
+        pickFirst("**/libc++_shared.so")
+        pickFirst("**/libbifrost.so")
+    }
 }
 
 dependencies {
@@ -44,10 +58,32 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.7.0")
     implementation("androidx.compose.material3:material3:1.3.0")
     implementation("androidx.compose.ui:ui-tooling-preview:1.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.google.code.gson:gson:2.10.1")
+    
     debugImplementation("androidx.compose.ui:ui-tooling:1.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.0")
 }
 
+// Custom task to build Rust library before Android build
+tasks.register<Exec>("buildRustLibrary") {
+    workingDir = file("rust-core")
+    commandLine("./build-android.sh")
+    
+    doFirst {
+        println("Building Rust library for Android...")
+    }
+}
+
+// Make Android build depend on Rust build
+tasks.whenTaskAdded {
+    if (name == "preBuild") {
+        dependsOn("buildRustLibrary")
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.buildDir)
+    delete(file("rust-core/target"))
 }
